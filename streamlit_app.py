@@ -2,58 +2,60 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import ta
+from datetime import datetime, timedelta
 
 # Function to fetch stock data and calculate indicators
-def get_stock_data(ticker, period='1y'):
-    stock = yf.Ticker(ticker)
-    df = stock.history(period=period)
+def get_stock_data(tickers, date):
+    data = []
+    for ticker in tickers:
+        stock = yf.Ticker(ticker)
+        df = stock.history(start=date, end=date + timedelta(days=1))
+        
+        if not df.empty:
+            # Calculate MACD
+            close_series = stock.history(start=date - timedelta(days=33), end=date)['Close']
+            macd = ta.trend.macd_diff(close_series).iloc[-1]
+            
+            # Calculate Rahul Mohinder Oscillator (RMO)
+            rmo = (ta.momentum.roc(close_series, window=10) - ta.momentum.roc(close_series, window=30)).iloc[-1]
+            
+            data.append({
+                'Ticker': ticker,
+                'Open': round(df['Open'].iloc[0], 5),
+                'High': round(df['High'].iloc[0], 5),
+                'Low': round(df['Low'].iloc[0], 5),
+                'Close': round(df['Close'].iloc[0], 5),
+                'MACD': 1 if macd >= 0 else 0,
+                'RMO': 1 if rmo >= 0 else 0
+            })
     
-    # Calculate MACD
-    df['MACD'] = ta.trend.macd_diff(df['Close'])
-    
-    # Calculate Rahul Mohinder Oscillator (RMO)
-    df['RMO'] = ta.momentum.roc(df['Close'], window=10) - ta.momentum.roc(df['Close'], window=30)
-    
-    # Reset index to make Date a column
-    df = df.reset_index()
-    
-    # Add Ticker column
-    df['Ticker'] = ticker
-    
-    # Select and reorder columns
-    df = df[['Date', 'Ticker', 'Open', 'High', 'Low', 'Close', 'MACD', 'RMO']]
-    
-    # Rename columns to match desired format
-    df.columns = ['Date', 'Ticker', 'O', 'H', 'L', 'C', 'MACD', 'RMO']
-    
-    return df
+    return pd.DataFrame(data)
 
 # Streamlit app
 def main():
     st.title('Dutch Stock Tickers with OHLC and Technical Indicators')
 
-    # List of Dutch stock tickers (you can expand this list)
+    # List of Dutch stock tickers
     dutch_tickers = ['ASML.AS', 'RDSA.AS', 'UNA.AS', 'AD.AS', 'INGA.AS']
 
-    # Sidebar for user input
-    selected_ticker = st.sidebar.selectbox('Select a Dutch stock ticker', dutch_tickers)
-    
-    # Fetch and display stock data
-    df = get_stock_data(selected_ticker)
+    # Date range for data
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=365)  # One year of data
 
-    # Display data in the requested format
-    st.subheader(f'Stock Data for {selected_ticker}')
-    st.dataframe(df)
+    # Date selector
+    selected_date = st.date_input(
+        "Select a date",
+        min_value=start_date,
+        max_value=end_date,
+        value=end_date
+    )
 
-    # Optional: Add charts
-    st.subheader('Stock Price Chart')
-    st.line_chart(df.set_index('Date')['C'])
+    # Fetch data for selected date
+    df = get_stock_data(dutch_tickers, selected_date)
 
-    st.subheader('MACD Chart')
-    st.line_chart(df.set_index('Date')['MACD'])
-
-    st.subheader('Rahul Mohinder Oscillator Chart')
-    st.line_chart(df.set_index('Date')['RMO'])
+    # Display data for the selected date
+    st.subheader(f'Stock Data for {selected_date}')
+    st.table(df)
 
 if __name__ == '__main__':
     main()
