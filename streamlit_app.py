@@ -3,19 +3,28 @@ import yfinance as yf
 import pandas as pd
 import ta
 
-# Function to fetch stock data
+# Function to fetch stock data and calculate indicators
 def get_stock_data(ticker, period='1y'):
     stock = yf.Ticker(ticker)
     df = stock.history(period=period)
-    return df
-
-# Function to calculate technical indicators
-def add_indicators(df):
-    # MACD
+    
+    # Calculate MACD
     df['MACD'] = ta.trend.macd_diff(df['Close'])
     
-    # Rahul Mohinder Oscillator (RMO)
+    # Calculate Rahul Mohinder Oscillator (RMO)
     df['RMO'] = ta.momentum.roc(df['Close'], window=10) - ta.momentum.roc(df['Close'], window=30)
+    
+    # Reset index to make Date a column
+    df = df.reset_index()
+    
+    # Add Ticker column
+    df['Ticker'] = ticker
+    
+    # Select and reorder columns
+    df = df[['Date', 'Ticker', 'Open', 'High', 'Low', 'Close', 'MACD', 'RMO']]
+    
+    # Rename columns to match desired format
+    df.columns = ['Date', 'Ticker', 'O', 'H', 'L', 'C', 'MACD', 'RMO']
     
     return df
 
@@ -31,25 +40,20 @@ def main():
     
     # Fetch and display stock data
     df = get_stock_data(selected_ticker)
-    df = add_indicators(df)
 
-    # Display OHLC data
-    st.subheader(f'OHLC Data for {selected_ticker}')
-    st.dataframe(df[['Open', 'High', 'Low', 'Close']])
-
-    # Display technical indicators
-    st.subheader('Technical Indicators')
-    st.dataframe(df[['MACD', 'RMO']])
+    # Display data in the requested format
+    st.subheader(f'Stock Data for {selected_ticker}')
+    st.dataframe(df)
 
     # Optional: Add charts
     st.subheader('Stock Price Chart')
-    st.line_chart(df['Close'])
+    st.line_chart(df.set_index('Date')['C'])
 
     st.subheader('MACD Chart')
-    st.line_chart(df['MACD'])
+    st.line_chart(df.set_index('Date')['MACD'])
 
     st.subheader('Rahul Mohinder Oscillator Chart')
-    st.line_chart(df['RMO'])
+    st.line_chart(df.set_index('Date')['RMO'])
 
 if __name__ == '__main__':
     main()
