@@ -1,33 +1,45 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import ta
+import numpy as np
+from ta.trend import MACD
 from datetime import datetime, timedelta
 
-# Function to fetch stock data and calculate indicators
-def get_stock_data(tickers, date):
+def calculate_rmo(close, sto_period=6, mto_period=10, lto_period=14, signal_period=3):
+    sto = close.diff(sto_period)
+    mto = close.diff(mto_period)
+    lto = close.diff(lto_period)
+    
+    rmo = (sto + mto + lto) / 3
+    signal = rmo.ewm(span=signal_period, adjust=False).mean()
+    
+    return rmo, signal
+
+def get_stock_data(tickers, end_date):
+    start_date = end_date - timedelta(days=100)  # Get 100 days of data for calculations
     data = []
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(start=date, end=date + timedelta(days=1))
+            df = stock.history(start=start_date, end=end_date)
             
             if not df.empty:
-                # Calculate MACD
-                close_series = stock.history(start=date - timedelta(days=33), end=date)['Close']
-                macd = ta.trend.macd_diff(close_series).iloc[-1]
+                # Calculate MACD with standard settings (12, 26, 9)
+                macd_indicator = MACD(df['Close'], window_slow=26, window_fast=12, window_sign=9)
+                macd = macd_indicator.macd_diff()
                 
-                # Calculate Rahul Mohinder Oscillator (RMO)
-                rmo = (ta.momentum.roc(close_series, window=10) - ta.momentum.roc(close_series, window=30)).iloc[-1]
+                # Calculate RMO
+                rmo, signal = calculate_rmo(df['Close'])
                 
+                last_day = df.index[-1]
                 data.append({
                     'Ticker': ticker,
-                    'Open': round(df['Open'].iloc[0], 5),
-                    'High': round(df['High'].iloc[0], 5),
-                    'Low': round(df['Low'].iloc[0], 5),
-                    'Close': round(df['Close'].iloc[0], 5),
-                    'MACD': 1 if macd >= 0 else 0,
-                    'RMO': 1 if rmo >= 0 else 0
+                    'Open': round(df.loc[last_day, 'Open'], 5),
+                    'High': round(df.loc[last_day, 'High'], 5),
+                    'Low': round(df.loc[last_day, 'Low'], 5),
+                    'Close': round(df.loc[last_day, 'Close'], 5),
+                    'MACD': 1 if macd.iloc[-1] >= 0 else 0,
+                    'RMO': 1 if (rmo.iloc[-1] > signal.iloc[-1] or (rmo.iloc[-1] > 0 and rmo.iloc[-1] > rmo.iloc[-2])) else 0
                 })
         except Exception as e:
             st.warning(f"Could not fetch data for {ticker}: {str(e)}")
