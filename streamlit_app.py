@@ -149,7 +149,7 @@ def get_index_data(index_tickers, end_date):
 
 # Streamlit app
 def main():
-    st.title('European Stock Tickers and Indices with Technical Indicators')
+    st.title('Art Of Trading ')
 
     # Lists of biggest companies by country
     dutch_tickers = ['ASML.AS', 'REN.AS', 'UNA.AS', 'RDSA.AS', 'AD.AS', 'INGA.AS', 'PHIA.AS', 'KPN.AS', 'DSM.AS', 'RAND.AS', 'AKZA.AS', 'MT.AS', 'HEIA.AS', 'PRX.AS', 'WKL.AS', 'AGN.AS', 'NN.AS', 'ASRNL.AS', 'GLPG.AS', 'URW.AS']
@@ -189,14 +189,16 @@ def main():
             elif val == 0:
                 return 'background-color: red'
         return ''
-
+    
+    # Display index data
+    st.subheader(f'Index Data for {selected_date}')
+    st.dataframe(df_indices.style.applymap(color_cells))
+    
     # Display data for the selected date with formatting
     st.subheader(f'Stock Data for {selected_date}')
     st.dataframe(df_stocks.style.applymap(color_cells))
 
-    # Display index data
-    st.subheader(f'Index Data for {selected_date}')
-    st.dataframe(df_indices.style.applymap(color_cells))
+
 
 if __name__ == '__main__':
     main()
