@@ -8,6 +8,22 @@ from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
 
+# Inject custom CSS to manage overflow
+st.markdown(
+    """
+    <style>
+    .stApp {
+        overflow: hidden;
+    }
+    .stMultiColumn {
+        display: flex;
+        flex-wrap: nowrap;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 def calculate_rmo(close, sto_period=6, mto_period=10, lto_period=14, signal_period=3):
     sto = close.diff(sto_period)
     mto = close.diff(mto_period)
