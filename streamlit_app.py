@@ -100,9 +100,38 @@ def get_stock_data(tickers, end_date):
     
     return pd.DataFrame(data)
 
+def get_index_data(index_tickers, end_date):
+    start_date = end_date - timedelta(days=100)  # Get 100 days of data for calculations
+    data = []
+    for ticker in index_tickers:
+        try:
+            index = yf.Ticker(ticker)
+            df = index.history(start=start_date, end=end_date)
+            
+            if not df.empty:
+                # RMO
+                rmo, signal = calculate_rmo(df['Close'])
+                
+                # MACD
+                macd_indicator = MACD(df['Close'], window_slow=26, window_fast=12, window_sign=9)
+                macd = macd_indicator.macd_diff()
+                
+                last_day = df.index[-1]
+                
+                data.append({
+                    'Ticker': ticker,
+                    'Close': round(df.loc[last_day, 'Close'], 2),
+                    'RMO': 1 if (rmo.iloc[-1] > signal.iloc[-1] or (rmo.iloc[-1] > 0 and rmo.iloc[-1] > rmo.iloc[-2])) else 0,
+                    'MACD': 1 if macd.iloc[-1] >= 0 else 0
+                })
+        except Exception as e:
+            st.warning(f"Could not fetch data for {ticker}: {str(e)}")
+    
+    return pd.DataFrame(data)
+
 # Streamlit app
 def main():
-    st.title('European Stock Tickers with OHLC and Technical Indicators')
+    st.title('European Stock Tickers and Indices with Technical Indicators')
 
     # Lists of biggest companies by country
     dutch_tickers = ['ASML.AS', 'REN.AS', 'UNA.AS', 'RDSA.AS', 'AD.AS', 'INGA.AS', 'PHIA.AS', 'KPN.AS', 'DSM.AS', 'RAND.AS', 'AKZA.AS', 'MT.AS', 'HEIA.AS', 'PRX.AS', 'WKL.AS', 'AGN.AS', 'NN.AS', 'ASRNL.AS', 'GLPG.AS', 'URW.AS']
@@ -114,6 +143,9 @@ def main():
     german_tickers = ['ADS.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BMW.DE', 'CON.DE', 'DAI.DE', 'DB1.DE', 'DBK.DE', 'DPW.DE', 'DTE.DE', 'EOAN.DE', 'FME.DE', 'FRE.DE', 'HEI.DE', 'HEN3.DE', 'IFX.DE', 'LIN.DE', 'MRK.DE', 'MUV2.DE']
 
     all_tickers = dutch_tickers + belgian_tickers + french_tickers + german_tickers
+
+    # Add index tickers
+    index_tickers = ['^GDAXI', '^AEX', '^FCHI']  # DAX, AEX, CAC 40
 
     # Date range for data
     end_date = datetime.now().date()
@@ -128,7 +160,8 @@ def main():
     )
 
     # Fetch data for selected date
-    df = get_stock_data(all_tickers, selected_date)
+    df_stocks = get_stock_data(all_tickers, selected_date)
+    df_indices = get_index_data(index_tickers, selected_date)
 
     # Apply conditional formatting
     def color_cells(val):
@@ -141,7 +174,11 @@ def main():
 
     # Display data for the selected date with formatting
     st.subheader(f'Stock Data for {selected_date}')
-    st.dataframe(df.style.applymap(color_cells))
+    st.dataframe(df_stocks.style.applymap(color_cells))
+
+    # Display index data
+    st.subheader(f'Index Data for {selected_date}')
+    st.dataframe(df_indices.style.applymap(color_cells))
 
 if __name__ == '__main__':
     main()
