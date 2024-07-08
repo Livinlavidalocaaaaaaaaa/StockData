@@ -6,6 +6,8 @@ from ta.trend import MACD, EMAIndicator
 from ta.momentum import RSIIndicator, StochasticOscillator
 from datetime import datetime, timedelta
 
+st.set_page_config(layout="wide")
+
 def calculate_rmo(close, sto_period=6, mto_period=10, lto_period=14, signal_period=3):
     sto = close.diff(sto_period)
     mto = close.diff(mto_period)
