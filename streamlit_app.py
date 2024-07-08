@@ -89,7 +89,14 @@ def style_dataframe(df):
 def main():
     st.title('European Stock Tickers with OHLC and Technical Indicators')
 
-    # ... (keep the ticker lists as they were) ...
+    # Define ticker lists
+    uk_tickers = ['BP.L', 'SHEL.L', 'GSK.L', 'AZN.L', 'ULVR.L', 'HSBA.L', 'RIO.L', 'DGE.L', 'REL.L', 'LSEG.L']
+    german_tickers = ['SAP.DE', 'SIE.DE', 'ALV.DE', 'DTE.DE', 'BAS.DE', 'BAY.DE', 'BMW.DE', 'DTG.DE', 'DB1.DE', 'DPW.DE']
+    french_tickers = ['OR.PA', 'SU.PA', 'AI.PA', 'BNP.PA', 'MC.PA', 'SAN.PA', 'AIR.PA', 'CS.PA', 'EL.PA', 'KER.PA']
+    swiss_tickers = ['NESN.SW', 'ROG.SW', 'NOVN.SW', 'UHR.SW', 'ABBN.SW', 'CSGN.SW', 'SREN.SW', 'ZURN.SW', 'LONN.SW', 'GIVN.SW']
+    
+    # Combine all tickers
+    all_tickers = uk_tickers + german_tickers + french_tickers + swiss_tickers
 
     # Date range for data
     end_date = datetime.now().date()
