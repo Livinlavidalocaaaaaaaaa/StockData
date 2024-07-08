@@ -20,83 +20,70 @@ def calculate_momentum(close, period=14):
     return close / close.shift(period) * 100
 
 def get_stock_data(tickers, end_date):
-    start_date = end_date - timedelta(days=101)  # Get 101 days of data for calculations
+    start_date = end_date - timedelta(days=100)  # Get 100 days of data for calculations
     data = []
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
             df = stock.history(start=start_date, end=end_date)
             
-            if not df.empty and len(df) > 1:
-                # Calculate indicators (similar to before, but for two days)
+            if not df.empty:
+                # 21 Day EMA
                 ema_21 = EMAIndicator(df['Close'], window=21).ema_indicator()
+                
+                # MACD
                 macd_indicator = MACD(df['Close'], window_slow=26, window_fast=12, window_sign=9)
                 macd = macd_indicator.macd_diff()
+                
+                # RMO
                 rmo, signal = calculate_rmo(df['Close'])
+                
+                # Momentum Oscillator
                 momentum = calculate_momentum(df['Close'])
+                
+                # Stochastic Oscillator
                 stoch = StochasticOscillator(df['High'], df['Low'], df['Close'])
+                
+                # RSI
                 rsi = RSIIndicator(df['Close']).rsi()
                 
-                for i in [-2, -1]:  # Calculate for yesterday and today
-                    day = df.index[i]
-                    prev_day = df.index[i-1]
-                    
-                    indicators = {
-                        '21 Day EMA': 1 if df.loc[day, 'Close'] > ema_21.iloc[i] else 0,
-                        'MACD': 1 if macd.iloc[i] >= 0 else 0,
-                        'Exp. MACD': 1 if macd.iloc[i] > macd.iloc[i-1] else 0,
-                        'Volume': 1 if df.loc[day, 'Volume'] > df.loc[prev_day, 'Volume'] else 0,
-                        'Momentum': 1 if momentum.iloc[i] > momentum.iloc[i-1] else 0,
-                        'Stochastic': 1 if stoch.stoch().iloc[i] > stoch.stoch().iloc[i-1] else 0,
-                        'RSI': 1 if rsi.iloc[i] > rsi.iloc[i-1] else 0,
-                    }
-                    
-                    aot = sum(indicators.values()) / len(indicators) * 100
-                    rmo_value = 1 if (rmo.iloc[i] > signal.iloc[i] or (rmo.iloc[i] > 0 and rmo.iloc[i] > rmo.iloc[i-1])) else 0
-                    
-                    data_point = {
-                        'Ticker': ticker,
-                        'Date': day.date(),
-                        'Open': round(df.loc[day, 'Open'], 5),
-                        'High': round(df.loc[day, 'High'], 5),
-                        'Low': round(df.loc[day, 'Low'], 5),
-                        'Close': round(df.loc[day, 'Close'], 5),
-                        **indicators,
-                        'AoT': aot,
-                        'RMO': rmo_value,
-                    }
-                    data.append(data_point)
+                last_day = df.index[-1]
+                prev_day = df.index[-2]
+                
+                data.append({
+                    'Ticker': ticker,
+                    'Open': round(df.loc[last_day, 'Open'], 5),
+                    'High': round(df.loc[last_day, 'High'], 5),
+                    'Low': round(df.loc[last_day, 'Low'], 5),
+                    'Close': round(df.loc[last_day, 'Close'], 5),
+                    '21 Day EMA': 1 if df.loc[last_day, 'Close'] > ema_21.iloc[-1] else 0,
+                    'MACD': 1 if macd.iloc[-1] >= 0 else 0,
+                    'Exp. MACD': 1 if macd.iloc[-1] > macd.iloc[-2] else 0,
+                    'Volume': 1 if df.loc[last_day, 'Volume'] > df.loc[prev_day, 'Volume'] else 0,
+                    'Momentum': 1 if momentum.iloc[-1] > momentum.iloc[-2] else 0,
+                    'Stochastic': 1 if stoch.stoch().iloc[-1] > stoch.stoch().iloc[-2] else 0,
+                    'RSI': 1 if rsi.iloc[-1] > rsi.iloc[-2] else 0,
+                    'RMO': 1 if (rmo.iloc[-1] > signal.iloc[-1] or (rmo.iloc[-1] > 0 and rmo.iloc[-1] > rmo.iloc[-2])) else 0
+                })
         except Exception as e:
             st.warning(f"Could not fetch data for {ticker}: {str(e)}")
     
     return pd.DataFrame(data)
 
-def style_dataframe(df):
-    def color_cells(val):
-        color = 'green' if val == 1 else 'red' if val == 0 else 'white'
-        return f'background-color: {color}'
-    
-    styled = df.style.applymap(color_cells, subset=[col for col in df.columns if col not in ['Ticker', 'Date', 'Open', 'High', 'Low', 'Close', 'AoT']])
-    
-    def color_aot(val):
-        return 'background-color: green' if val == 100 else ''
-    
-    styled = styled.applymap(color_aot, subset=['AoT'])
-    
-    return styled
-
 # Streamlit app
 def main():
     st.title('European Stock Tickers with OHLC and Technical Indicators')
 
-    # Define ticker lists
-    uk_tickers = ['BP.L', 'SHEL.L', 'GSK.L', 'AZN.L', 'ULVR.L', 'HSBA.L', 'RIO.L', 'DGE.L', 'REL.L', 'LSEG.L']
-    german_tickers = ['SAP.DE', 'SIE.DE', 'ALV.DE', 'DTE.DE', 'BAS.DE', 'BAY.DE', 'BMW.DE', 'DTG.DE', 'DB1.DE', 'DPW.DE']
-    french_tickers = ['OR.PA', 'SU.PA', 'AI.PA', 'BNP.PA', 'MC.PA', 'SAN.PA', 'AIR.PA', 'CS.PA', 'EL.PA', 'KER.PA']
-    swiss_tickers = ['NESN.SW', 'ROG.SW', 'NOVN.SW', 'UHR.SW', 'ABBN.SW', 'CSGN.SW', 'SREN.SW', 'ZURN.SW', 'LONN.SW', 'GIVN.SW']
+    # Lists of biggest companies by country
+    dutch_tickers = ['ASML.AS', 'REN.AS', 'UNA.AS', 'RDSA.AS', 'AD.AS', 'INGA.AS', 'PHIA.AS', 'KPN.AS', 'DSM.AS', 'RAND.AS', 'AKZA.AS', 'MT.AS', 'HEIA.AS', 'PRX.AS', 'WKL.AS', 'AGN.AS', 'NN.AS', 'ASRNL.AS', 'GLPG.AS', 'URW.AS']
     
-    # Combine all tickers
-    all_tickers = uk_tickers + german_tickers + french_tickers + swiss_tickers
+    belgian_tickers = ['ABI.BR', 'KBC.BR', 'UCB.BR', 'SOLB.BR', 'GBLB.BR', 'COLR.BR', 'PROX.BR', 'ACKB.BR', 'GLPG.BR', 'ARGX.BR', 'UMI.BR', 'BEFB.BR', 'TESB.BR', 'APAM.BR', 'BPOST.BR', 'TNET.BR', 'SOF.BR', 'ONTEX.BR', 'AED.BR', 'BARCO.BR']
+    
+    french_tickers = ['AI.PA', 'AIR.PA', 'ALO.PA', 'BN.PA', 'BNP.PA', 'CA.PA', 'CAP.PA', 'CS.PA', 'DG.PA', 'ENGI.PA', 'KER.PA', 'LR.PA', 'MC.PA', 'ML.PA', 'OR.PA', 'ORA.PA', 'PUB.PA', 'RI.PA', 'SAF.PA', 'SAN.PA']
+    
+    german_tickers = ['ADS.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BMW.DE', 'CON.DE', 'DAI.DE', 'DB1.DE', 'DBK.DE', 'DPW.DE', 'DTE.DE', 'EOAN.DE', 'FME.DE', 'FRE.DE', 'HEI.DE', 'HEN3.DE', 'IFX.DE', 'LIN.DE', 'MRK.DE', 'MUV2.DE']
+
+    all_tickers = dutch_tickers + belgian_tickers + french_tickers + german_tickers
 
     # Date range for data
     end_date = datetime.now().date()
@@ -110,40 +97,12 @@ def main():
         value=end_date
     )
 
-    # Fetch data for selected date and the day before
+    # Fetch data for selected date
     df = get_stock_data(all_tickers, selected_date)
-    
-    # Separate today's and yesterday's data
-    df_today = df[df['Date'] == selected_date].copy()
-    df_yesterday = df[df['Date'] == selected_date - timedelta(days=1)].copy()
-    
-    # Calculate AoT Change and RMO Change
-    df_today['AoT Change'] = ((df_today['AoT'] == 100) & (df_yesterday['AoT'] != 100)).astype(int)
-    df_today['RMO Change'] = ((df_today['RMO'] == 1) & (df_yesterday['RMO'] == 0)).astype(int)
-    
-    # Reorder columns
-    columns_order = ['Ticker', 'Open', 'High', 'Low', 'Close', '21 Day EMA', 'MACD', 'Exp. MACD', 'Volume', 'Momentum', 'Stochastic', 'RSI', 'RMO', 'AoT', 'AoT Change', 'RMO Change']
-    df_display = df_today[columns_order]
-    
+
     # Display data for the selected date
     st.subheader(f'Stock Data for {selected_date}')
-    
-    # Add filter buttons
-    st.write("Filter by:")
-    cols = st.columns(len(columns_order))
-    filters = {}
-    for i, col in enumerate(columns_order):
-        with cols[i]:
-            if col not in ['Ticker', 'Open', 'High', 'Low', 'Close', 'AoT']:
-                filters[col] = st.checkbox(col, key=f"filter_{col}")
-    
-    # Apply filters
-    for col, filter_on in filters.items():
-        if filter_on:
-            df_display = df_display[df_display[col] == 1]
-    
-    # Display the styled dataframe
-    st.dataframe(style_dataframe(df_display), width=1200, height=600)
+    st.table(df)
 
 if __name__ == '__main__':
     main()
