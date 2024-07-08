@@ -2,7 +2,8 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from ta.trend import MACD
+from ta.trend import MACD, EMAIndicator
+from ta.momentum import RSIIndicator, StochasticOscillator
 from datetime import datetime, timedelta
 
 def calculate_rmo(close, sto_period=6, mto_period=10, lto_period=14, signal_period=3):
@@ -15,6 +16,9 @@ def calculate_rmo(close, sto_period=6, mto_period=10, lto_period=14, signal_peri
     
     return rmo, signal
 
+def calculate_momentum(close, period=14):
+    return close / close.shift(period) * 100
+
 def get_stock_data(tickers, end_date):
     start_date = end_date - timedelta(days=100)  # Get 100 days of data for calculations
     data = []
@@ -24,21 +28,41 @@ def get_stock_data(tickers, end_date):
             df = stock.history(start=start_date, end=end_date)
             
             if not df.empty:
-                # Calculate MACD with standard settings (12, 26, 9)
+                # 21 Day EMA
+                ema_21 = EMAIndicator(df['Close'], window=21).ema_indicator()
+                
+                # MACD
                 macd_indicator = MACD(df['Close'], window_slow=26, window_fast=12, window_sign=9)
                 macd = macd_indicator.macd_diff()
                 
-                # Calculate RMO
+                # RMO
                 rmo, signal = calculate_rmo(df['Close'])
                 
+                # Momentum Oscillator
+                momentum = calculate_momentum(df['Close'])
+                
+                # Stochastic Oscillator
+                stoch = StochasticOscillator(df['High'], df['Low'], df['Close'])
+                
+                # RSI
+                rsi = RSIIndicator(df['Close']).rsi()
+                
                 last_day = df.index[-1]
+                prev_day = df.index[-2]
+                
                 data.append({
                     'Ticker': ticker,
                     'Open': round(df.loc[last_day, 'Open'], 5),
                     'High': round(df.loc[last_day, 'High'], 5),
                     'Low': round(df.loc[last_day, 'Low'], 5),
                     'Close': round(df.loc[last_day, 'Close'], 5),
+                    '21 Day EMA': 1 if df.loc[last_day, 'Close'] > ema_21.iloc[-1] else 0,
                     'MACD': 1 if macd.iloc[-1] >= 0 else 0,
+                    'Exp. MACD': 1 if macd.iloc[-1] > macd.iloc[-2] else 0,
+                    'Volume': 1 if df.loc[last_day, 'Volume'] > df.loc[prev_day, 'Volume'] else 0,
+                    'Momentum': 1 if momentum.iloc[-1] > momentum.iloc[-2] else 0,
+                    'Stochastic': 1 if stoch.stoch().iloc[-1] > stoch.stoch().iloc[-2] else 0,
+                    'RSI': 1 if rsi.iloc[-1] > rsi.iloc[-2] else 0,
                     'RMO': 1 if (rmo.iloc[-1] > signal.iloc[-1] or (rmo.iloc[-1] > 0 and rmo.iloc[-1] > rmo.iloc[-2])) else 0
                 })
         except Exception as e:
